@@ -5,12 +5,16 @@ Response Middleware
 用于记录请求日志、生成 TraceID 和计算请求耗时
 """
 
+import os
 import time
 import uuid
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+from app.core.config import config as _app_config
 from app.core.logger import logger
+
+_IS_SERVERLESS = os.getenv("SERVER_TYPE") == "serverless"
 
 
 class ResponseLoggerMiddleware(BaseHTTPMiddleware):
@@ -23,6 +27,10 @@ class ResponseLoggerMiddleware(BaseHTTPMiddleware):
         # 生成请求 ID
         trace_id = str(uuid.uuid4())
         request.state.trace_id = trace_id
+
+        # Serverless 环境下定期从数据库同步配置
+        if _IS_SERVERLESS:
+            await _app_config.reload_if_stale()
 
         start_time = time.time()
 

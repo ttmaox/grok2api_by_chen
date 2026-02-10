@@ -5,6 +5,7 @@
 - config.defaults.toml: 默认配置基线
 """
 
+import time
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
@@ -127,6 +128,7 @@ class Config:
         self._defaults = {}
         self._code_defaults = {}
         self._defaults_loaded = False
+        self._last_load_time = 0.0
 
     def register_defaults(self, defaults: Dict[str, Any]):
         """注册代码中定义的默认值"""
@@ -192,9 +194,16 @@ class Config:
                     logger.info("Configuration automatically migrated and cleaned.")
 
             self._config = merged
+            self._last_load_time = time.monotonic()
         except Exception as e:
             logger.error(f"Error loading config: {e}")
             self._config = {}
+
+    async def reload_if_stale(self, interval: int = 30):
+        """如果配置过期则重新加载（类似 TokenManager.reload_if_stale）"""
+        if time.monotonic() - self._last_load_time < interval:
+            return
+        await self.load()
 
     def get(self, key: str, default: Any = None) -> Any:
         """
