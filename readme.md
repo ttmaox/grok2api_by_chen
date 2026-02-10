@@ -84,6 +84,8 @@ docker compose up -d
 | `SERVER_TYPE`         | 服务类型（serverless 时启用配置跨实例同步）         | `""`      | `serverless`                                      |
 
 > MySQL 示例：`mysql+aiomysql://user:password@host:3306/db`（若填 `mysql://` 会自动转为 `mysql+aiomysql://`）
+>
+> 如需 SSL 连接 MySQL，请在 URL 末尾添加 `?ssl=true`，例如：`mysql://user:password@host:3306/db?ssl=true`
 
 ### 可用次数
 

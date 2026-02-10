@@ -77,6 +77,8 @@ Default password: `grok2api` (config key `app.app_key`, change it in production)
 | `SERVER_TYPE` | Server type (`serverless` enables cross-instance config sync) | `""` | `serverless` |
 
 > MySQL example: `mysql+aiomysql://user:password@host:3306/db` (if you set `mysql://`, it will be normalized to `mysql+aiomysql://`)
+>
+> To enable SSL for MySQL, append `?ssl=true` to the URL, e.g. `mysql://user:password@host:3306/db?ssl=true`
 
 ### Usage limits
 

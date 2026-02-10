@@ -506,6 +506,21 @@ class SQLStorage(BaseStorage):
 
         self.dialect = url.split(":", 1)[0].split("+", 1)[0].lower()
 
+        # aiomysql 不支持通过 URL 查询参数启用 SSL，需解析 ?ssl=true 后通过 connect_args 传入
+        connect_args = {}
+        if self.dialect in ("mysql", "mariadb"):
+            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+            parsed = urlparse(url)
+            qs = parse_qs(parsed.query)
+            ssl_val = qs.pop("ssl", [None])[0]
+            if ssl_val and ssl_val.lower() in ("1", "true", "yes"):
+                import ssl as _ssl
+
+                connect_args["ssl"] = _ssl.create_default_context()
+            # 从 URL 中移除 ssl 参数，避免 aiomysql 报错
+            url = urlunparse(parsed._replace(query=urlencode(qs, doseq=True)))
+
         # 配置 robust 的连接池
         self.engine = create_async_engine(
             url,
@@ -514,6 +529,7 @@ class SQLStorage(BaseStorage):
             max_overflow=10,
             pool_recycle=3600,
             pool_pre_ping=True,
+            connect_args=connect_args,
         )
         self.async_session = async_sessionmaker(self.engine, expire_on_commit=False)
         self._initialized = False
