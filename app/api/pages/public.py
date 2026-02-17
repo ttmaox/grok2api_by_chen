@@ -20,25 +20,25 @@ async def root():
 async def public_login():
     if not is_public_enabled():
         raise HTTPException(status_code=404, detail="Not Found")
-    return FileResponse(STATIC_DIR / "public/pages/login.html")
+    return FileResponse(STATIC_DIR / "pub/pages/login.html")
 
 
 @router.get("/imagine", include_in_schema=False)
 async def public_imagine():
     if not is_public_enabled():
         raise HTTPException(status_code=404, detail="Not Found")
-    return FileResponse(STATIC_DIR / "public/pages/imagine.html")
+    return FileResponse(STATIC_DIR / "pub/pages/imagine.html")
 
 
 @router.get("/voice", include_in_schema=False)
 async def public_voice():
     if not is_public_enabled():
         raise HTTPException(status_code=404, detail="Not Found")
-    return FileResponse(STATIC_DIR / "public/pages/voice.html")
+    return FileResponse(STATIC_DIR / "pub/pages/voice.html")
 
 
 @router.get("/video", include_in_schema=False)
 async def public_video():
     if not is_public_enabled():
         raise HTTPException(status_code=404, detail="Not Found")
-    return FileResponse(STATIC_DIR / "public/pages/video.html")
+    return FileResponse(STATIC_DIR / "pub/pages/video.html")

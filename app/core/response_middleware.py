@@ -40,6 +40,7 @@ class ResponseLoggerMiddleware(BaseHTTPMiddleware):
             "/login",
             "/imagine",
             "/voice",
+            "/video",
             "/admin",
             "/admin/login",
             "/admin/config",
