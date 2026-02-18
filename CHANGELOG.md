@@ -34,17 +34,7 @@
 | `app/core/config.py` | 新增 `_last_load_time` 字段和 `reload_if_stale(interval=30)` 异步方法，间隔 30 秒从数据库重新加载配置 |
 | `app/core/response_middleware.py` | 导入 `os` 和 `config`，读取 `SERVER_TYPE` 环境变量，在 `dispatch` 中调用 `_app_config.reload_if_stale()` |
 
-### 3. Middleware 路径跳过列表补全 `/video`
-
-**原因：** 上游 `response_middleware.py` 的静态页面跳过列表遗漏了 `"/video"` 路径，导致 `/video` 页面请求会经过不必要的日志中间件处理。
-
-**涉及文件及改动：**
-
-| 文件 | 改动说明 |
-|------|---------|
-| `app/core/response_middleware.py` | 路径跳过列表添加 `"/video"` |
-
-### 4. MySQL SSL 连接支持（`?ssl=true` URL 参数）
+### 3. MySQL SSL 连接支持（`?ssl=true` URL 参数）
 
 **原因：** `aiomysql` 不支持通过 URL 查询参数启用 SSL（如 `mysql://host/db?ssl=true`），需要手动解析 URL 中的 `?ssl=true` 参数，将其转换为 `connect_args={"ssl": ssl.create_default_context()}`，然后从 URL 中移除 `ssl` 参数以避免 `aiomysql` 报错。
 
@@ -176,8 +166,6 @@ Vercel 部署环境中，admin 页面（`/admin/login`、`/admin/config` 等）�
 
 3. **根本原因：** Vercel 构建/部署对名为 `public` 的目录有特殊处理（前端框架约定），导致 `app/static/public/` 下的文件在 Lambda 运行时**不存在**。`FileResponse` 内部调用 `os.stat()` 失败，抛出 `RuntimeError`，被 `generic_exception_handler` 捕获后返回 500。
 
-4. **附带问题：** `app/core/response_middleware.py` 的路径跳过列表中遗漏了 `"/video"`，导致 `/video` 页面请求会经过不必要的日志中间件处理。
-
 ### 修改内容
 
 #### 1. 重命名静态资源目录
@@ -223,26 +211,6 @@ FileResponse(STATIC_DIR / "pub/pages/video.html")
 | `app/static/pub/pages/video.html` | 2 处 | CSS (`video.css`) + JS (`video.js`) |
 | `app/static/pub/pages/voice.html` | 2 处 | CSS (`voice.css`) + JS (`voice.js`) |
 
-#### 4. 修复 middleware 遗漏的路径
-
-**文件：** `app/core/response_middleware.py`
-
-在 `ResponseLoggerMiddleware.dispatch` 方法的路径跳过列表中添加 `"/video"`：
-
-```python
-# Before
-if path.startswith("/static/") or path in (
-    "/", "/login", "/imagine", "/voice",
-    "/admin", "/admin/login", "/admin/config", "/admin/cache", "/admin/token",
-):
-
-# After
-if path.startswith("/static/") or path in (
-    "/", "/login", "/imagine", "/voice", "/video",
-    "/admin", "/admin/login", "/admin/config", "/admin/cache", "/admin/token",
-):
-```
-
 ### 涉及文件清单
 
 | 文件路径 | 变更类型 | 说明 |
@@ -253,7 +221,6 @@ if path.startswith("/static/") or path in (
 | `app/static/pub/pages/login.html` | 修改 | 1 处静态资源 URL 更新 |
 | `app/static/pub/pages/video.html` | 修改 | 2 处静态资源 URL 更新 |
 | `app/static/pub/pages/voice.html` | 修改 | 2 处静态资源 URL 更新 |
-| `app/core/response_middleware.py` | 修改 | 路径跳过列表添加 "/video" |
 
 ### 验证方式
 
