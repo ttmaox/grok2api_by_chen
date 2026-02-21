@@ -16,11 +16,12 @@
 | 文件 | 改动说明 |
 |------|---------|
 | `app/static/pub/` (整个目录) | 由 `app/static/public/` 重命名而来 |
-| `app/api/pages/public.py` | 4 处 `FileResponse` 路径 `"public/pages/..."` → `"pub/pages/..."` |
+| `app/api/pages/public.py` | 5 处 `FileResponse` 路径 `"public/pages/..."` → `"pub/pages/..."` |
 | `app/static/pub/pages/imagine.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/` |
 | `app/static/pub/pages/login.html` | JS 引用路径 `/static/public/` → `/static/pub/` |
 | `app/static/pub/pages/video.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/` |
 | `app/static/pub/pages/voice.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/` |
+| `app/static/pub/pages/chat.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/`（上游 v1.5.0 新增） |
 
 ### 2. Serverless 配置跨实例同步（`SERVER_TYPE=serverless`）
 
@@ -42,7 +43,86 @@
 
 | 文件 | 改动说明 |
 |------|---------|
-| `app/core/storage.py:509-529` | 在 `SQLStorage.__init__` 中新增 SSL 参数解析逻辑：解析 URL 中的 `?ssl=true`，通过 `connect_args` 传入 SSL 上下文，从 URL 移除 `ssl` 参数 |
+| `app/core/storage.py:555-589` | 在 `SQLStorage.__init__` 中新增 SSL 参数解析逻辑：解析 URL 中的 `?ssl=true`，通过 `connect_args` 传入 SSL 上下文，从 URL 移除 `ssl` 参数 |
+
+---
+
+## 2026-02-21 — merge: sync upstream/main (1638baa) into test branch
+
+**Branch:** `test`
+**上游基准：** `upstream/main` @ `1638baa`（上次同步：`7b02255`）
+
+### 合并的上游变更
+
+从上游合并了 12 个新提交（`7b02255..1638baa`），包含以下功能和修复：
+
+#### 1. Chat 聊天页面（新功能）
+
+- **新增文件：** `app/static/pub/css/chat.css`、`app/static/pub/js/chat.js`、`app/static/pub/pages/chat.html`
+- **路由：** `app/api/pages/public.py` 新增 `/chat` 路由
+- **导航：** `app/static/common/html/public-header.html` 新增 Chat 链接
+- **登录跳转：** `app/static/pub/js/login.js` 登录成功后跳转目标从 `/imagine` 改为 `/chat`
+
+#### 2. Browser Impersonation 会话管理
+
+- **文件：** `app/services/reverse/utils/headers.py`、`app/services/reverse/utils/session.py`
+- 增强会话管理，引入浏览器指纹伪装（browser impersonation）
+- `ResettableSession` 新增 `impersonate` 参数支持
+
+#### 3. Token 管理增强
+
+- **文件：** `app/services/token/manager.py`、`app/api/v1/admin_api/token.py`
+- 新增 `usage_flush_interval_sec` 配置项（`config.defaults.toml`），控制使用量写入最小间隔（默认 5 秒）
+- **文件：** `app/core/storage.py` — 大量变更：
+  - 新增 `save_tokens_delta()` 增量保存方法
+  - tokens 表新增字段：`status`、`quota`、`created_at`、`last_used_at`、`use_count`、`fail_count`、`last_fail_at`、`last_fail_reason`、`last_sync_at`、`tags`、`note`、`last_asset_clear_at`、`data`、`data_hash`、`updated_at`
+  - Redis `save_config` 逻辑调整（先 delete 再 hset）
+
+#### 4. Docker 构建优化
+
+- **文件：** `Dockerfile`
+- 重构为多阶段构建（multi-stage build），优化镜像体积和构建效率
+
+#### 5. WebSocket 代理竞态修复
+
+- **文件：** `app/services/reverse/utils/websocket.py`
+- 修复 WebSocket 连接中代理配置的竞态条件（race condition）
+
+#### 6. 版本号升级
+
+- `pyproject.toml`：`0.3.1` → `1.5.0`
+- 全部 HTML 页面及公共 JS 中的静态资源版本号：`v=0.3.1` → `v=1.5.0`
+
+#### 7. 其他
+
+- `config.defaults.toml`：`app_url` 默认值从 `http://127.0.0.1:8000` 改为空字符串
+- `scripts/test_usage_response.py`：已删除（不再需要）
+- `readme.md` / `docs/README.en.md`：更新图片尺寸
+- `uv.lock`：依赖版本更新
+- `app/api/v1/image.py`、`app/services/grok/services/video.py`：小幅调整
+
+### 冲突解决
+
+8 个文件存在冲突，解决策略一致——保持 `/static/pub/` 路径，采纳上游新内容和版本号 `v=1.5.0`：
+
+| 文件 | 冲突类型 | 解决方式 |
+|------|---------|---------|
+| `app/api/pages/public.py` | 内容冲突 | 保持 `pub/` 路径，采纳新增 `/chat` 路由（路径改为 `pub/pages/chat.html`） |
+| `app/static/pub/pages/imagine.html` | 路径+内容冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.0` |
+| `app/static/pub/pages/login.html` | 路径+内容冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.0` |
+| `app/static/pub/pages/video.html` | 路径+内容冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.0` |
+| `app/static/pub/pages/voice.html` | 路径+内容冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.0` |
+| `app/static/pub/css/chat.css` | 文件位置冲突 | 上游新增于 `public/`，接受并放入 `pub/` |
+| `app/static/pub/js/chat.js` | 文件位置冲突 | 上游新增于 `public/`，接受并放入 `pub/` |
+| `app/static/pub/pages/chat.html` | 文件位置冲突 | 上游新增于 `public/`，接受并放入 `pub/`，内部路径改为 `/static/pub/` |
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| `static/pub` 重命名 | ✓ 完整 | 新增 chat 三件套已同步至 `pub/`，路径引用已修正 |
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`、`config.py`、`response_middleware.py` 均无变化 |
+| MySQL SSL 支持 | ✓ 完整 | 代码逻辑不变，因上游 `storage.py` 扩展行号从 `509-529` 移至 `555-589` |
 
 ---
 
