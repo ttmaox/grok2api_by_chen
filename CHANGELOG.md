@@ -35,15 +35,67 @@
 | `app/core/config.py` | 新增 `_last_load_time` 字段和 `reload_if_stale(interval=30)` 异步方法，间隔 30 秒从数据库重新加载配置 |
 | `app/core/response_middleware.py` | 导入 `os` 和 `config`，读取 `SERVER_TYPE` 环境变量，在 `dispatch` 中调用 `_app_config.reload_if_stale()` |
 
-### 3. MySQL SSL 连接支持（`?ssl=true` URL 参数）
+### ~~3. MySQL SSL 连接支持~~ （已由上游修复，不再需要）
 
-**原因：** `aiomysql` 不支持通过 URL 查询参数启用 SSL（如 `mysql://host/db?ssl=true`），需要手动解析 URL 中的 `?ssl=true` 参数，将其转换为 `connect_args={"ssl": ssl.create_default_context()}`，然后从 URL 中移除 `ssl` 参数以避免 `aiomysql` 报错。
+> 上游 PR [#204](https://github.com/chenyme/grok2api/pull/204)（`c818bdf`）在 `StorageFactory` 中实现了更完善的 SQL SSL 方案，同时支持 MySQL（aiomysql）和 PostgreSQL（asyncpg），支持 `ssl`/`sslmode`/`ssl-mode` 多种参数名及多种 SSL 模式（disable/prefer/require/verify-ca/verify-full）。本 fork 原先在 `SQLStorage.__init__` 中的简易 `?ssl=true` 解析逻辑已在 `186e6bb` 合并时移除，完全采用上游方案。
 
-**涉及文件及改动：**
+---
 
-| 文件 | 改动说明 |
-|------|---------|
-| `app/core/storage.py:555-589` | 在 `SQLStorage.__init__` 中新增 SSL 参数解析逻辑：解析 URL 中的 `?ssl=true`，通过 `connect_args` 传入 SSL 上下文，从 URL 移除 `ssl` 参数 |
+## 2026-02-22 — merge: sync upstream/main (186e6bb) into test branch
+
+**Branch:** `test`
+**上游基准：** `upstream/main` @ `186e6bb`（上次同步：`1638baa`）
+
+### 合并的上游变更
+
+从上游合并了 7 个新提交（`1638baa..186e6bb`），包含以下功能和修复：
+
+#### 1. SQL SSL 连接支持（MySQL + PostgreSQL）
+
+- **PR：** [#204](https://github.com/chenyme/grok2api/pull/204)（`c818bdf`）
+- **文件：** `app/core/storage.py`
+- `SQLStorage.__init__` 新增 `connect_args` 参数，SSL 配置由外部传入
+- `StorageFactory` 新增完整的 SSL 处理链：
+  - `_prepare_sql_url_and_connect_args()`：从 URL 中提取 `ssl`/`sslmode`/`ssl-mode` 参数，构建 `connect_args`
+  - `_normalize_ssl_mode()`：标准化 SSL 模式别名
+  - `_build_mysql_ssl_context()`：为 aiomysql 构建 SSLContext
+  - `_build_sql_connect_args()`：按后端类型生成连接参数
+- 支持模式：`disable`、`prefer`、`require`、`verify-ca`、`verify-full`（及各种别名）
+- `_normalize_sql_url()` 新增 `mariadb+aiomysql://` 前缀处理
+
+#### 2. OpenAI ChatCompletion 格式响应（图片/图片编辑）
+
+- **PR：** [#200](https://github.com/chenyme/grok2api/pull/200)（`679b946`、`e5e9225`）
+- **新增文件：** `app/services/grok/utils/response.py` — 响应格式化工具（`make_response_id`、`make_chat_chunk`、`make_chat_response`、`wrap_image_content`）
+- **文件：** `app/services/grok/services/image.py`、`app/services/grok/services/image_edit.py`
+  - 新增 `chat_format` 参数，支持以 OpenAI ChatCompletion 格式输出图片生成结果
+  - 流式输出支持 `chat.completion.chunk` 事件格式
+- **文件：** `app/api/v1/chat.py`
+  - 图片生成/编辑通过 chat 路由调用时自动启用 `chat_format=True`
+  - 非流式响应使用 `make_chat_response()` 替代手动构造
+
+#### 3. Base64 下载路径修复
+
+- **PR：** [#209](https://github.com/chenyme/grok2api/pull/209)（`68895f0`）
+- **文件：** `app/services/grok/utils/download.py`
+- `_normalize_path()` 重构：支持相对路径（非完整 URL）的资源下载
+- 移除 `_is_url()` 方法，放宽 `parse_b64()` 的 URL 校验
+
+### 冲突解决
+
+1 个文件存在冲突：
+
+| 文件 | 冲突类型 | 解决方式 |
+|------|---------|---------|
+| `app/core/storage.py` | 内容冲突（`SQLStorage.__init__` 中 `connect_args` 传递方式） | 移除 fork 的自定义 SSL 解析逻辑，采用上游方案（SSL 处理移至 `StorageFactory`） |
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| `static/pub` 重命名 | ✓ 完整 | 本次上游变更未涉及相关文件 |
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`、`config.py`、`response_middleware.py` 均无变化 |
+| MySQL SSL 支持 | ✗ 已移除 | 上游 PR #204 提供了更完善的方案，fork 自定义代码已移除 |
 
 ---
 
