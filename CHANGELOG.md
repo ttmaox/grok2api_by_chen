@@ -41,6 +41,75 @@
 
 ---
 
+## 2026-03-03 — merge: sync upstream/main (d76b5e4) into test branch
+
+**Branch:** `test`
+**上游基准：** `upstream/main` @ `d76b5e4`（上次同步：`0d0ed8f`）
+
+### 合并的上游变更
+
+从上游合并了 18 个新提交（`0d0ed8f..d76b5e4`），包含以下功能和修复：
+
+#### 1. cf_refresh 自动刷新模块（新功能）
+
+- **新增文件：** `app/services/cf_refresh/` — Cloudflare cookie 自动刷新服务（config、scheduler、solver）
+- **文件：** `main.py` — 集成 cf_refresh 启动逻辑
+- **文件：** `config.defaults.toml` — 新增 cf_refresh 相关配置项
+- **文件：** `docker-compose.yml` — 大幅重构，支持 flaresolverr、warp 等可选组件
+
+#### 2. Chat 多会话管理与 UI 重构
+
+- **PR：** [#251](https://github.com/chenyme/grok2api/pull/251)
+- **文件：** `app/static/public/css/chat.css`、`app/static/public/js/chat.js`、`app/static/public/pages/chat.html`
+  - 多会话管理（创建、切换、删除会话）
+  - UI 交互优化，移动端适配
+  - 安全渲染修复（XSS 防护）
+
+#### 3. Chat 路由公钥验证
+
+- **文件：** `app/api/v1/public_api/__init__.py` — chat 路由集成 public key 验证
+- **文件：** `app/core/auth.py` — 认证逻辑增强，新增 API key 相关功能
+- **文件：** `app/services/token/manager.py` — token 管理器大幅扩展
+
+#### 4. 其他改进
+
+- `app/services/reverse/utils/headers.py`、`session.py` — 会话管理改进
+- `app/services/grok/services/chat.py` — 聊天服务调整
+- `app/services/grok/utils/tool_call.py` — 工具调用变更
+- `app/static/common/css/toast.css` — 新增 toast 样式
+- `app/static/common/js/toast.js` — toast 组件增强
+- `app/static/common/css/common.css` — 公共样式更新
+- `app/static/common/js/admin-auth.js` — admin 认证 JS 更新
+- `app/static/admin/js/config.js` — admin 配置页面增强（cf_refresh、imagine_fast 等）
+
+#### 5. 版本号升级
+
+- `pyproject.toml`：`1.5.0` → `1.5.4`
+- 全部 HTML 页面及公共 JS 中的静态资源版本号：`v=1.5.0` → `v=1.5.4`
+
+### 冲突解决
+
+5 个文件存在冲突（上游 `static/public/` vs fork 的 `static/pub/` 路径）：
+
+| 文件 | 冲突类型 | 解决方式 |
+|------|---------|---------|
+| `app/static/pub/pages/chat.html` | 路径+内容冲突 | 采纳上游最新内容，路径替换为 `/static/pub/` |
+| `app/static/pub/pages/imagine.html` | 路径冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.4` |
+| `app/static/pub/pages/login.html` | 路径冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.4` |
+| `app/static/pub/pages/video.html` | 路径冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.4` |
+| `app/static/pub/pages/voice.html` | 路径冲突 | 保持 `/static/pub/` 路径，采纳版本号 `v=1.5.4` |
+
+另外 `chat.css` 和 `chat.js` 也同步了上游最新版本到 `pub/` 目录。
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| `static/pub` 重命名 | ✓ 完整 | HTML 文件路径已全部替换，CSS/JS 同步至 `pub/` |
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`、`config.py`、`response_middleware.py` 均无变化 |
+
+---
+
 ## 2026-02-22 — merge: sync upstream/main (186e6bb) into test branch
 
 **Branch:** `test`
