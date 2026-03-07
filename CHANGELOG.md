@@ -7,21 +7,9 @@
 > 上游仓库：[chenyme/grok2api](https://github.com/chenyme/grok2api) `upstream/main`
 > 以下为本 fork（`test` 分支）相对于上游的**全部定制改动**，每次同步上游时需保留。
 
-### 1. 静态资源目录 `static/public` → `static/pub`（Vercel 兼容）
+### ~~1. 静态资源目录 `static/public` → `static/pub`（Vercel 兼容）~~ （已由上游解决，不再需要）
 
-**原因：** Vercel 构建/部署对名为 `public` 的目录有特殊处理（前端框架约定），导致 `app/static/public/` 下的文件在 Lambda 运行时不存在，`FileResponse` 内部 `os.stat()` 失败返回 500。
-
-**涉及文件及改动：**
-
-| 文件 | 改动说明 |
-|------|---------|
-| `app/static/pub/` (整个目录) | 由 `app/static/public/` 重命名而来 |
-| `app/api/pages/public.py` | 5 处 `FileResponse` 路径 `"public/pages/..."` → `"pub/pages/..."` |
-| `app/static/pub/pages/imagine.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/` |
-| `app/static/pub/pages/login.html` | JS 引用路径 `/static/public/` → `/static/pub/` |
-| `app/static/pub/pages/video.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/` |
-| `app/static/pub/pages/voice.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/` |
-| `app/static/pub/pages/chat.html` | CSS/JS 引用路径 `/static/public/` → `/static/pub/`（上游 v1.5.0 新增） |
+> 上游在 v1.6.0 中将静态资源从 `app/static/` 整体搬迁到项目根目录 `_public/static/`，并将 `public` 子目录重命名为 `function`。`_public` 以下划线开头，不会触发 Vercel 对 `public` 目录的特殊处理，因此本 fork 原先的 `public → pub` 重命名不再需要。`app/static/pub/` 目录及 `app/api/pages/public.py` 已在 `7ab06be` 合并时移除。
 
 ### 2. Serverless 配置跨实例同步（`SERVER_TYPE=serverless`）
 
@@ -38,6 +26,128 @@
 ### ~~3. MySQL SSL 连接支持~~ （已由上游修复，不再需要）
 
 > 上游 PR [#204](https://github.com/chenyme/grok2api/pull/204)（`c818bdf`）在 `StorageFactory` 中实现了更完善的 SQL SSL 方案，同时支持 MySQL（aiomysql）和 PostgreSQL（asyncpg），支持 `ssl`/`sslmode`/`ssl-mode` 多种参数名及多种 SSL 模式（disable/prefer/require/verify-ca/verify-full）。本 fork 原先在 `SQLStorage.__init__` 中的简易 `?ssl=true` 解析逻辑已在 `186e6bb` 合并时移除，完全采用上游方案。
+
+---
+
+## 2026-03-07 — merge: sync upstream/main (7ab06be) into test branch
+
+**Branch:** `test`
+**上游基准：** `upstream/main` @ `7ab06be`（上次同步：`d76b5e4`）
+
+### 合并的上游变更
+
+从上游合并了 26 个新提交（`d76b5e4..7ab06be`），包含以下功能和修复：
+
+#### 1. 静态资源目录重大重组
+
+- **整体搬迁：** `app/static/` → 项目根目录 `_public/static/`
+- **`public` → `function`：** 用户功能页面从 `static/public/` 重命名为 `static/function/`
+- **`public-header` → `function-header`：** 公共导航组件更名
+- **`app/api/pages/public.py` → `function.py`：** 页面路由模块重命名
+- **`app/api/v1/public_api/` → `function/`：** API 路由模块重命名
+- **`app/api/v1/admin_api/` → `admin/`：** Admin API 模块重命名
+- **Dockerfile** 更新：复制 `_public` 目录，添加服务器配置变量
+
+#### 2. 服务器从 uvicorn 切换到 Granian
+
+- **文件：** `main.py`、`docker-compose.yml`、`pyproject.toml`
+- 禁用 `python main.py` 直接启动，改用 `granian --interface asgi main:app` 命令
+- Granian 提供更高性能的 ASGI 服务
+
+#### 3. 视频生成 API 增强
+
+- **文件：** `app/api/v1/video.py` — 大幅扩展，新增 OpenAI 兼容的视频生成端点 `/videos`
+  - 支持 JSON 和 multipart/form-data 两种请求格式
+  - 完整参数验证：分辨率、质量、时长（6-30 秒）、参考图等
+- **新增文件：** `app/services/grok/services/video_extend.py` — 视频扩展服务
+  - 基于已有视频进行延伸生成，支持自定义扩展时长、宽高比、分辨率
+
+#### 4. 国际化（i18n）系统
+
+- **新增目录：** `_public/static/i18n/` — 轻量级零依赖 i18n 模块
+  - 支持中文（zh）和英文（en）
+  - 检测优先级：localStorage > URL `?lang=` 参数 > 浏览器语言 > 默认中文
+  - HTML 属性翻译（`data-i18n`、`data-i18n-placeholder` 等）+ JS 动态翻译 `t(key, params)`
+- **PR：** [#269](https://github.com/chenyme/grok2api/pull/269)
+
+#### 5. 文本清理（Sanitization）安全增强
+
+- **PR：** [#284](https://github.com/chenyme/grok2api/pull/284)
+- **文件：** `app/api/v1/admin/config.py` — `_sanitize_proxy_text()` 清理代理配置中的特殊 Unicode 字符（多种破折号、引号、零宽字符、BOM 等），确保 latin-1 兼容性
+- **文件：** `app/api/v1/admin/token.py` — `_sanitize_token_text()` 清理 Token 文本，支持 `sso=` 前缀自动处理
+- **文件：** `app/services/reverse/utils/headers.py` — `_sanitize_header_value()` 规范化 HTTP header 值
+
+#### 6. 认证系统增强
+
+- **文件：** `app/core/auth.py`
+  - 新增 `verify_function_key()` Function API 专用认证中间件
+  - 新增 `is_function_enabled()` 和 `get_function_api_key()` 函数
+  - API key 比较使用 HMAC 恒定时间比较，防止时序攻击
+
+#### 7. Token 管理增强
+
+- **文件：** `app/api/v1/admin/token.py`
+  - 批量 Token 启用/禁用功能
+  - 异步批量刷新 + SSE 进度流
+  - 批量 NSFW (Unhinged) 模式开启（同步/异步）
+  - 分布式锁确保多 worker 状态一致性
+
+#### 8. 配置管理增强
+
+- **文件：** `app/core/config.py`
+  - 新增 `_prune_unknown_config()` 移除不在 defaults 中的未知配置项
+  - 新增 `_summarize_removed()` 生成移除项日志摘要
+- **文件：** `config.defaults.toml`
+  - 新增 `app.function_enabled`、`app.function_key`（功能玩法开关和密钥）
+  - 新增 `app.image_format`、`app.video_format`（输出格式配置）
+  - 新增 `video.concurrent`、`video.timeout`、`video.stream_timeout`（视频并发/超时）
+  - 新增 `app.custom_instructions`（自定义指令）
+  - 新增 `proxy.cf_cookies`（CF cookies 配置）
+  - 新增 `proxy.skip_proxy_ssl`（跳过代理 SSL 验证）
+
+#### 9. 代理和网络改进
+
+- **文件：** `app/services/reverse/utils/session.py` — 新增 `_should_skip_proxy_ssl()` 支持自签名代理证书
+- **文件：** `app/services/reverse/utils/websocket.py` — 增强 WebSocket 代理处理，支持 SOCKS4/4a/5/5h 代理
+- **文件：** `app/services/reverse/utils/headers.py` — 增强浏览器指纹检测，CF cookies 支持
+
+#### 10. 其他改进
+
+- **GitHub 模板：** 新增 issue 模板（bug report、enhancement、idea、question、documentation）和 PR 模板
+- **GitHub Actions：** 新增 `pr-meta.yml` 和 `security.yml` 工作流
+- `.python-version`：更新到 Python 3.13
+- `docker-compose.yml`：端口解耦（host/app），支持 `SERVER_STORAGE_URL` 环境变量
+- `pyproject.toml`：版本号 `1.5.4` → `1.6.0`
+
+### 冲突解决
+
+14 个文件存在冲突（fork 的 `app/static/pub/` vs 上游的 `_public/static/function/` 路径重组）：
+
+| 文件 | 冲突类型 | 解决方式 |
+|------|---------|---------|
+| `_public/static/function/css/chat.css` | rename/rename | 采纳上游版本 |
+| `_public/static/function/css/imagine.css` | rename/rename | 采纳上游版本 |
+| `_public/static/function/css/video.css` | rename/rename | 采纳上游版本 |
+| `_public/static/function/css/voice.css` | rename/rename | 采纳上游版本 |
+| `_public/static/function/js/chat.js` | rename/rename | 采纳上游版本 |
+| `_public/static/function/js/imagine.js` | rename/rename | 采纳上游版本 |
+| `_public/static/function/js/video.js` | rename/rename | 采纳上游版本 |
+| `_public/static/function/js/voice.js` | rename/rename | 采纳上游版本 |
+| `_public/static/function/pages/chat.html` | rename/rename | 采纳上游版本 |
+| `_public/static/function/pages/imagine.html` | rename/rename | 采纳上游版本 |
+| `_public/static/function/pages/video.html` | rename/rename | 采纳上游版本 |
+| `_public/static/function/pages/voice.html` | rename/rename | 采纳上游版本 |
+| `_public/static/admin/pages/login.html` | rename/rename | 采纳上游版本 |
+| `app/api/pages/public.py` | modify/delete | 接受删除（上游已替换为 `function.py`） |
+
+另外删除了 fork 的 `app/static/pub/` 整个目录（15 个文件），该定制不再需要。
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| ~~`static/pub` 重命名~~ | ✗ 已废弃 | 上游 v1.6.0 将静态资源搬至 `_public/static/function/`，不再有 `public` 命名冲突 |
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`（`SERVER_TYPE=serverless`）、`config.py`（`reload_if_stale()`）、`response_middleware.py`（serverless 检测）均自动合并无冲突 |
 
 ---
 
