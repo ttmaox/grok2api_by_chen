@@ -29,6 +29,55 @@
 
 ---
 
+## 2026-03-08 — merge: sync upstream/main (c45b2c6) into test branch
+
+**Branch:** `test`
+**上游基准：** `upstream/main` @ `c45b2c6`（上次同步：`7ab06be`）
+
+### 合并的上游变更
+
+从上游合并了 2 个新提交（`7ab06be..c45b2c6`），包含 PR [#291](https://github.com/chenyme/grok2api/pull/291) 的合并：
+
+#### 1. 视频生成 API 重构
+
+- **文件：** `app/services/grok/services/video.py` — 大幅重写（+1672/-887 行）
+  - 视频生成流程优化和重构
+  - 分页控件修复
+
+#### 2. 视频超分配置
+
+- **文件：** `config.defaults.toml` — 新增 `upscale_timing` 字段
+
+#### 3. 异常处理增强
+
+- **文件：** `app/core/exceptions.py` — UpstreamException 参数化改进
+
+#### 4. 前端 UI 更新
+
+- Cache 管理页面增强（CSS/JS/HTML）
+- Token 管理页面增强（CSS/JS/HTML）
+- Config 管理页面调整
+- 视频播放器 JS 新增
+- i18n 翻译更新（中/英）
+- 版本号更新（footer/header JS）
+
+#### 5. 文档与版本号
+
+- `readme.md`、`docs/README.en.md` — 文档更新
+- `pyproject.toml` — 版本号更新
+
+### 冲突解决
+
+**无冲突。** 上游变更未涉及 fork 的任何定制文件，`git merge` 自动完成。
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`、`config.py`、`response_middleware.py` 均未被上游修改，自动保留 |
+
+---
+
 ## 2026-03-07 — merge: sync upstream/main (7ab06be) into test branch
 
 **Branch:** `test`
