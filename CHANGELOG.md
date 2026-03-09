@@ -29,6 +29,42 @@
 
 ---
 
+## 2026-03-09 — merge: sync upstream/main (19bfce3) into vercel branch
+
+**Branch:** `vercel`
+**上游基准：** `upstream/main` @ `19bfce3`（上次同步：`c45b2c6`）
+
+### 合并的上游变更
+
+从上游合并了 2 个新提交（`c45b2c6..19bfce3`），包含 PR [#299](https://github.com/chenyme/grok2api/pull/299) 的合并：
+
+#### 1. 移除已废弃的 grok-4-mini 模型
+
+- **文件：** `app/services/grok/services/model.py` — 移除 `grok-4-mini` 模型定义（ModelInfo 条目）
+
+#### 2. AppChatReverse payload 增强
+
+- **文件：** `app/services/reverse/app_chat.py`
+  - `deviceEnvInfo` 字段排序调整
+  - 为 `grok-420` 模型添加 `enable420 = True` 标志
+  - 新增 payload JSON 调试日志输出
+
+#### 3. 文档更新
+
+- **文件：** `readme.md`、`docs/README.en.md` — 模型列表中移除 `grok-4-mini`
+
+### 冲突解决
+
+**无冲突。** 上游变更未涉及 fork 的任何定制文件，`git merge` 自动完成。
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`、`config.py`、`response_middleware.py` 均未被上游修改，自动保留 |
+
+---
+
 ## 2026-03-08 — merge: sync upstream/main (c45b2c6) into test branch
 
 **Branch:** `test`
