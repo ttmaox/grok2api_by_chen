@@ -50,6 +50,7 @@
 - **文件：** `app/services/token/pool.py` — `get_available_token()` 在消耗模式下使用新的可用性判断
 - **文件：** `_public/static/admin/js/token.js`、`token.html`、`config.js` — 前端 UI 添加消耗模式控制
 - **文件：** `config.defaults.toml` — 新增 `token.consumed_mode_enabled` 配置项
+- **上游 Bug：** `app/api/v1/admin/token.py` 第 53 行调用了 `get_config()` 但遗漏导入，导致 `/v1/admin/tokens` 端点抛出 `NameError` → HTTP 500。已在本 fork 中修复（添加 `from app.core.config import get_config`）
 
 #### 3. PR [#314](https://github.com/chenyme/grok2api/pull/314) — Serverless 冷启动数据库初始化修复
 
