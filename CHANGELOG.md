@@ -20,12 +20,80 @@
 | 文件 | 改动说明 |
 |------|---------|
 | `vercel.json` | 保留 `"SERVER_TYPE": "serverless"` 环境变量（上游已移除） |
-| `app/core/config.py` | 新增 `_last_load_time` 字段和 `reload_if_stale(interval=30)` 异步方法，间隔 30 秒从数据库重新加载配置 |
+| `app/core/config.py` | 新增 `_last_load_time` 字段和 `reload_if_stale(interval=30)` 异步方法，间隔 30 秒从数据库重新加载配置（与上游 PR #314 的 `ensure_loaded()` 互补：上游解决冷启动初始化，fork 解决运行时跨实例同步） |
 | `app/core/response_middleware.py` | 导入 `os` 和 `config`，读取 `SERVER_TYPE` 环境变量，在 `dispatch` 中调用 `_app_config.reload_if_stale()` |
 
 ### ~~3. MySQL SSL 连接支持~~ （已由上游修复，不再需要）
 
 > 上游 PR [#204](https://github.com/chenyme/grok2api/pull/204)（`c818bdf`）在 `StorageFactory` 中实现了更完善的 SQL SSL 方案，同时支持 MySQL（aiomysql）和 PostgreSQL（asyncpg），支持 `ssl`/`sslmode`/`ssl-mode` 多种参数名及多种 SSL 模式（disable/prefer/require/verify-ca/verify-full）。本 fork 原先在 `SQLStorage.__init__` 中的简易 `?ssl=true` 解析逻辑已在 `186e6bb` 合并时移除，完全采用上游方案。
+
+---
+
+## 2026-03-18 — merge: sync upstream/main (7796e08) into serverless branch
+
+**Branch:** `serverless`
+**上游基准：** `upstream/main` @ `7796e08`（上次同步：`19bfce3`）
+
+### 合并的上游变更
+
+从上游合并了 24 个新提交（`19bfce3..7796e08`），包含 6 个 PR 的合并：
+
+#### 1. PR [#344](https://github.com/chenyme/grok2api/pull/344) — curl_cffi 导入修复
+
+- **文件：** `app/services/reverse/utils/retry.py` — 重组 `curl_cffi` 导入语句，`CurlError` 从根模块导入，其他异常从 `curl_cffi.requests.exceptions` 导入
+- **文件：** `pyproject.toml` — 移除 `[project.scripts]` 部分
+
+#### 2. PR [#315](https://github.com/chenyme/grok2api/pull/315) — Token consumed mode 配额管理
+
+- **文件：** `app/services/token/manager.py` — 新增 `_is_consumed_mode()` 方法，`consume_quota()` 和 `refill_token()` 根据模式调用不同的配额更新策略
+- **文件：** `app/services/token/models.py` — `is_available()` 支持 `consumed_mode` 参数；新增 `enter_cooling()`、`recover_active()`、`consume_with_consumed()`、`update_quota_with_consumed()` 方法
+- **文件：** `app/services/token/pool.py` — `get_available_token()` 在消耗模式下使用新的可用性判断
+- **文件：** `_public/static/admin/js/token.js`、`token.html`、`config.js` — 前端 UI 添加消耗模式控制
+- **文件：** `config.defaults.toml` — 新增 `token.consumed_mode_enabled` 配置项
+
+#### 3. PR [#314](https://github.com/chenyme/grok2api/pull/314) — Serverless 冷启动数据库初始化修复
+
+- **文件：** `app/core/config.py` — 新增 `_loaded`、`_load_lock` 字段和 `ensure_loaded()` 异步方法（asyncio Lock 保护的懒加载）
+- **文件：** `main.py` — `lifespan` 改用 `ensure_loaded()`；`create_app()` 新增 `ensure_config_loaded` HTTP 中间件
+
+> **与 fork 定制的关系：** 上游解决"冷启动时 lifespan 未执行导致配置未加载"问题；fork 的 `reload_if_stale()` 解决"运行时跨实例配置不同步"问题。**两者互补，均保留。**
+
+#### 4. PR [#312](https://github.com/chenyme/grok2api/pull/312) — Token 刷新逻辑与过期处理修复
+
+- **文件：** `app/services/reverse/rate_limits.py` — 增强 401 错误识别，区分令牌过期和 Cloudflare 拦截；异常添加 `is_token_expired`、`is_cloudflare` 标记
+- **文件：** `app/services/reverse/utils/retry.py` — 新增 `extract_status_for_retry()` 统一状态码提取；令牌过期时跳过重试
+- **文件：** `app/services/token/manager.py` — 改进 `refresh_tokens()` 过期判断精度，仅确认过期时才标记 `EXPIRED`
+- **文件：** `app/api/v1/admin/token.py` — Token 管理端点增强
+
+#### 5. PR [#311](https://github.com/chenyme/grok2api/pull/311) — IP 轮换代理池支持
+
+- **新增文件：** `app/core/proxy_pool.py` — 粘性代理选择模块，核心 API：`get_current_proxy()`、`rotate_proxy()`、`should_rotate_proxy()`、`build_http_proxies()`；支持逗号分隔的多代理 URL 配置；状态码 403/429/502 触发代理轮换
+- **服务集成：** `accept_tos.py`、`app_chat.py`、`assets_*.py`、`media_post.py`、`nsfw_mgmt.py`、`set_birth.py`、`video_upscale.py`、`ws_livekit.py` — 全部改用代理池 API 替代直接配置读取
+- **文件：** `app/services/reverse/utils/websocket.py` — 添加代理轮换重试机制，失败时自动轮换代理
+- **文件：** `app/services/grok/utils/upload.py` — 集成代理池并添加重试机制
+- **文件：** `app/services/cf_refresh/config.py` — 改为直接读取 config 对象避免循环引用
+
+#### 6. PR [#295](https://github.com/chenyme/grok2api/pull/295) — 视频公共资源链接生成
+
+- **新增文件：** `app/services/reverse/media_post_link.py` — `MediaPostLinkReverse` 类，通过 gRPC API 生成视频公开访问链接
+- **文件：** `app/services/grok/services/video.py` — 新增 `_public_asset_enabled()` 和 `_create_public_video_link()`，视频完成后可选生成公开链接
+- **文件：** `app/services/grok/utils/download.py` — 增强资源类型处理
+- **文件：** `config.defaults.toml` — 新增 `video.enable_public_asset` 配置项（默认关闭）
+- **文件：** `_public/static/i18n/locales/{en,zh}.json` — 添加相关国际化标签
+
+### 冲突解决
+
+1 个文件存在冲突：
+
+| 文件 | 冲突类型 | 解决方式 |
+|------|---------|---------|
+| `app/core/config.py` | `__init__` 和 `load()` 中的字段赋值冲突（fork 的 `_last_load_time` vs 上游的 `_loaded`/`_load_lock`） | 保留双方全部字段：`_last_load_time`（fork）+ `_loaded`、`_load_lock`（上游），`load()` 成功时同时设置 `_last_load_time` 和 `_loaded` |
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`（`SERVER_TYPE=serverless`）、`config.py`（`reload_if_stale()`）、`response_middleware.py`（serverless 检测）均保留，与上游 PR #314 的 `ensure_loaded()` 互补共存 |
 
 ---
 
