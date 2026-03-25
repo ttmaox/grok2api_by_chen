@@ -29,6 +29,66 @@
 
 ---
 
+## 2026-03-25 — merge: sync upstream/main (16e37b1) into serverless branch
+
+**Branch:** `serverless`
+**上游基准：** `upstream/main` @ `16e37b1`（上次同步：`26f6d41`）
+
+### 合并的上游变更
+
+从上游合并了 17 个新提交（`26f6d41..16e37b1`），包含 4 个 PR 的合并：
+
+#### 1. PR [#319](https://github.com/chenyme/grok2api/pull/319) — 限制日志暴涨并修复启动日志兼容问题
+
+- **文件：** `app/core/logger.py` — 完全重构日志处理，新增 `reload_logging_from_config()` 函数支持运行时动态重载日志配置，采用 loguru 文件轮转（rotation）和保留（retention）机制，支持 `LOG_MAX_FILE_SIZE_MB`、`LOG_MAX_FILES` 环境变量覆盖
+- **文件：** `app/core/response_middleware.py` — 新增 `_should_log_response()` 静态方法，实现智能日志过滤（支持 health check 过滤、慢请求阈值、状态码分级日志），去除每次请求的 Request 日志，改用 `logger.opt(exception=e).error` 和裸 `raise`
+- **文件：** `main.py` — 集成日志重载方法
+- **文件：** `app/services/reverse/app_chat.py` — 改进代理日志输出
+- **文件：** `config.defaults.toml` — 新增配置项：`log.max_file_size_mb`（100）、`log.max_files`（7）、`log.log_health_requests`（false）、`log.log_all_requests`（false）、`log.request_slow_ms`（3000）、`health.on_demand_refresh_enabled`（true）、`health.on_demand_refresh_min_interval_sec`（300）、`health.on_demand_refresh_max_tokens`（100）
+
+#### 2. PR [#336](https://github.com/chenyme/grok2api/pull/336) — 视频接口支持多图参考
+
+- **文件：** `app/api/v1/video.py` — 大幅重构参考图解析逻辑，新增 `_extract_last_user_prompt_and_images()` 和 `_parse_image_references()` 函数，支持多种图片格式（纯 URL 数组、OpenAI content-block 格式、JSON 字符串），支持 `@图<n>` / `@image<n>` 占位符语法
+- **文件：** `app/services/grok/services/video.py` — 核心视频服务更新（+761/-行），支持最多 7 张参考图
+- **文件：** `app/api/v1/function/video.py` — 函数接口调整
+- **前端：** `_public/static/function/` — 视频界面 CSS/JS/HTML 更新，参考图数量增加到 7 张
+- **国际化：** `_public/static/i18n/locales/{en,zh}.json` — 添加多图参考相关翻译
+
+#### 3. PR [#366](https://github.com/chenyme/grok2api/pull/366) — 添加 OpenAI 兼容的用量统计估算
+
+- **新增文件：** `app/services/grok/utils/usage.py` — 完整的 token 使用量估算工具库（165 行），提供 `estimate_tokens()`（UTF-8 字节/4 或分段数×0.75）、`estimate_prompt_tokens()`、`estimate_completion_tokens()`、`estimate_chat_usage()`、`build_chat_usage()`、`normalize_chat_usage()`、`to_responses_usage()` 等函数
+- **文件：** `app/services/grok/services/chat.py` — `StreamProcessor` 和 `CollectProcessor` 新增 `prompt_tokens` 参数，实时记录 content 和 tool_calls，SSE 响应中添加 usage 字段
+- **文件：** `app/services/grok/services/responses.py` — 调整用量返回格式
+- **新增测试：** `tests/test_openai_usage.py`（161 行）
+
+#### 4. PR [#374](https://github.com/chenyme/grok2api/pull/374) — 使用 app-chat REST API 作为主要图像生成方法
+
+- **文件：** `app/services/grok/services/image.py` — 新增 `_stream_app_chat()`、`_collect_app_chat()`、`_app_chat_request_overrides()` 方法，将图像生成主要方法从 ws_imagine 切换为 app-chat REST API，失败时自动降级回 ws_imagine（速率限制错误不降级）
+- **文件：** `app/services/grok/services/image_edit.py` — 重构为使用 `file_attachments` 参数替代旧的 `imageReferences` + `parentPostId`，统一使用 `grok-4` / `MODEL_MODE_AUTO`，删除 `_get_parent_post_id()` 方法
+- **文件：** `app/services/reverse/app_chat.py` — 新增 `_read_error_body()` 方法、`_log_proxy_state_once()` 去重日志函数，支持 `request_overrides` 参数
+- **文件：** `app/api/v1/chat.py` — 调整 chat API 集成
+
+#### 5. 版本号升级
+
+- `pyproject.toml`：`1.6.1` → `1.6.2`
+- 全部 HTML 页面及公共 JS 中的静态资源版本号同步更新
+
+### 冲突解决
+
+1 个文件存在冲突：
+
+| 文件 | 冲突类型 | 解决方式 |
+|------|---------|---------|
+| `app/core/response_middleware.py` | import 行冲突（fork 的 `config as _app_config` vs 上游的 `get_config`） | 合并为单行 `from app.core.config import config as _app_config, get_config`，保留 fork 的 serverless reload 逻辑 + 采纳上游的智能日志过滤 |
+
+### Fork 定制改动保留确认
+
+| 定制项 | 状态 | 备注 |
+|-------|------|------|
+| Serverless 配置同步 | ✓ 完整 | `vercel.json`（`SERVER_TYPE=serverless`）、`config.py`（`reload_if_stale()`）、`response_middleware.py`（serverless 检测 + 上游智能日志）均保留，与上游 PR #314 的 `ensure_loaded()` 互补共存 |
+
+---
+
 ## 2026-03-18 — merge: sync upstream/main (26f6d41) into serverless branch
 
 **Branch:** `serverless`
